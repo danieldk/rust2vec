@@ -8,7 +8,11 @@ use super::*;
 const FASTTEXT_FILEFORMAT_MAGIC: u32 = 793712314;
 const FASTTEXT_VERSION: u32 = 12;
 
-#[derive(Debug)]
+static EOS: &str = "</s>";
+const BOW: char = '<';
+const EOW: char = '>';
+
+#[derive(Clone, Debug)]
 pub enum Model {
     CBOW,
     SkipGram,
@@ -32,7 +36,7 @@ impl Model {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Loss {
     HierarchicalSoftmax,
     NegativeSampling,
@@ -56,7 +60,7 @@ impl Loss {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Args {
     dims: u32,
     window_size: u32,
@@ -135,13 +139,16 @@ pub struct Entry {
     word: String,
     count: u64,
     entry_type: EntryType,
-    subwords: u32,
+    subwords: Vec<u32>,
 }
 
-pub struct Dictionary {}
+pub struct Dictionary {
+    args: Args,
+    words: Vec<Entry>,
+}
 
 impl Dictionary {
-    fn read_binary<R>(reader: &mut R) -> Result<Dictionary, Error>
+    fn read_binary<R>(args: Args, reader: &mut R) -> Result<Dictionary, Error>
     where
         R: BufRead,
     {
@@ -151,10 +158,22 @@ impl Dictionary {
         let n_tokens = reader.read_u64::<LittleEndian>()?;
         let prune_idx_size = reader.read_i64::<LittleEndian>()?;
 
+        let mut words = Vec::with_capacity(size as usize);
         for i in 0..size {
             let word = util::read_string(reader, 0)?;
             let count = reader.read_u64::<LittleEndian>()?;
             let entry_type = EntryType::read_binary(reader)?;
+
+            words.push(Entry {
+                word,
+                count,
+                entry_type,
+                subwords: Vec::new(),
+            })
+        }
+
+        if prune_idx_size >= 0 {
+            unimplemented!();
         }
 
         for i in 0..prune_idx_size {
@@ -167,7 +186,33 @@ impl Dictionary {
             size, n_words, n_labels, n_tokens, prune_idx_size
         );
 
-        Ok(Dictionary {})
+        let mut dict = Dictionary { args, words };
+        dict.init_ngrams();
+
+        Ok(dict)
+    }
+
+    fn init_ngrams(&mut self) {
+        let n_words = self.words.len() as u32;
+
+        for word in &mut self.words {
+            if word.word == EOS {
+                continue;
+            }
+
+            let mut bounded_word = String::new();
+            bounded_word.push(BOW);
+            bounded_word.push_str(&word.word);
+            bounded_word.push(EOW);
+
+            let subwords = compute_subwords(
+                &bounded_word,
+                self.args.min_n,
+                self.args.max_n,
+                n_words,
+                self.args.bucket,
+            );
+        }
     }
 }
 
@@ -217,7 +262,7 @@ where
         }
 
         let args = Args::read_binary(reader)?;
-        let dict = Dictionary::read_binary(reader)?;
+        let dict = Dictionary::read_binary(args.clone(), reader)?;
 
         let quant_input = reader.read_u8()?;
         if quant_input == 1 {
@@ -235,6 +280,35 @@ where
 
         unimplemented!();
     }
+}
+
+fn compute_subwords(word: &str, min_n: u32, max_n: u32, n_words: u32, buckets: u32) -> Vec<u32> {
+    assert!(min_n >= max_n);
+
+    let chars: Vec<_> = word.chars().collect();
+
+    let mut hashes = Vec::new();
+
+    for ngram in util::NGrams::new(&chars, min_n as usize, max_n as usize) {
+        let h = fasttext_hash(ngram) % buckets;
+        hashes.push(n_words + h);
+    }
+
+    hashes
+}
+
+fn fasttext_hash(chars: &[char]) -> u32 {
+    let mut h = 2166136261;
+
+    for ch in chars {
+        let mut bytes = [0; 4];
+        for byte in ch.encode_utf8(&mut bytes).bytes() {
+            h = h ^ byte as u32;
+            h = h.wrapping_mul(16777619);
+        }
+    }
+
+    h
 }
 
 #[cfg(test)]
