@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::iter::Enumerate;
 use std::slice;
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::mem;
 use std::io::{BufRead, Write};
+use std::mem;
 use std::slice::from_raw_parts_mut;
 
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -34,7 +34,7 @@ where
         let mut words = Vec::with_capacity(n_words);
 
         for idx in 0..n_words {
-            let word = try!(read_string(reader, ' ' as u8));
+            let word = try!(util::read_string(reader, ' ' as u8));
             let word = word.trim();
             words.push(word.to_owned());
             indices.insert(word.to_owned(), idx);
@@ -51,24 +51,14 @@ where
         }
 
         Ok(super::embeddings::new_embeddings(
-            matrix,
-            embed_len,
-            indices,
-            words,
+            matrix, embed_len, indices, words,
         ))
     }
 }
 
 fn read_number(reader: &mut BufRead, delim: u8) -> Result<usize, Error> {
-    let field_str = try!(read_string(reader, delim));
+    let field_str = try!(util::read_string(reader, delim));
     Ok(try!(field_str.parse()))
-}
-
-fn read_string(reader: &mut BufRead, delim: u8) -> Result<String, Error> {
-    let mut buf = Vec::new();
-    try!(reader.read_until(delim, &mut buf));
-    buf.pop();
-    Ok(try!(String::from_utf8(buf)))
 }
 
 unsafe fn typed_to_bytes<T>(slice: &mut [T]) -> &mut [u8] {

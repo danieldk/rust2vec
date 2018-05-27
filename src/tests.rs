@@ -196,8 +196,6 @@ fn test_similarity() {
     let result = result.unwrap();
     assert_eq!(10, result.len());
 
-    println!("{:?}", result);
-
     for (idx, word_similarity) in result.iter().enumerate() {
         assert_eq!(SIMILARITY_ORDER[idx], word_similarity.word)
     }
@@ -214,8 +212,6 @@ fn test_similarity_limit() {
     assert!(result.is_some());
     let result = result.unwrap();
     assert_eq!(10, result.len());
-
-    println!("{:?}", result);
 
     for (idx, word_similarity) in result.iter().enumerate() {
         assert_eq!(SIMILARITY_ORDER_STUTTGART_10[idx], word_similarity.word)
