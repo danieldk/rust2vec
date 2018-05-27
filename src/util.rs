@@ -14,7 +14,7 @@ where
 }
 
 impl<'a, T> NGrams<'a, T> {
-    fn new(seq: &'a [T], min_n: usize, max_n: usize) -> Self {
+    pub fn new(seq: &'a [T], min_n: usize, max_n: usize) -> Self {
         assert!(min_n <= max_n);
 
         let upper = cmp::min(max_n, seq.len());
