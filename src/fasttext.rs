@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::io::BufRead;
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -145,6 +147,7 @@ pub struct Entry {
 pub struct Dictionary {
     args: Args,
     words: Vec<Entry>,
+    word_indices: HashMap<String, u32>,
 }
 
 impl Dictionary {
@@ -186,7 +189,12 @@ impl Dictionary {
             size, n_words, n_labels, n_tokens, prune_idx_size
         );
 
-        let mut dict = Dictionary { args, words };
+        let mut word_indices = HashMap::new();
+        for i in 0..size {
+            word_indices.insert(words[i as usize].word.clone(), i);
+        }
+
+        let mut dict = Dictionary { args, words, word_indices };
         dict.init_ngrams();
 
         Ok(dict)
