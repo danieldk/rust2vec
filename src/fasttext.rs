@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::io::BufRead;
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -194,7 +193,11 @@ impl Dictionary {
             word_indices.insert(words[i as usize].word.clone(), i);
         }
 
-        let mut dict = Dictionary { args, words, word_indices };
+        let mut dict = Dictionary {
+            args,
+            words,
+            word_indices,
+        };
         dict.init_ngrams();
 
         Ok(dict)
@@ -221,6 +224,28 @@ impl Dictionary {
                 self.args.bucket,
             );
         }
+    }
+
+    pub fn subwords(&self, word: &str) -> Vec<u32> {
+        if let Some(idx) = self.word_indices.get(word) {
+            return self.words[*idx as usize].subwords.clone();
+        }
+
+        if word != EOS {
+            return Vec::new();
+        }
+
+        let mut bounded_word = String::new();
+        bounded_word.push(BOW);
+        bounded_word.push_str(word);
+        bounded_word.push(EOW);
+        compute_subwords(
+            &bounded_word,
+            self.args.min_n,
+            self.args.max_n,
+            self.words.len() as u32,
+            self.args.bucket,
+        )
     }
 }
 
