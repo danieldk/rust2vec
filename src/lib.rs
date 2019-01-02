@@ -1,6 +1,8 @@
 mod embeddings;
 pub use crate::embeddings::{Embeddings, Iter};
 
+pub mod fasttext;
+
 pub mod similarity;
 
 pub mod subword;

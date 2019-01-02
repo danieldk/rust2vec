@@ -74,10 +74,10 @@ pub trait SubwordIndices {
     /// Return the subword indices of the subwords of a string.
     ///
     /// The n-grams that are used are of length *[min_n, max_n]*, these are
-    /// mapped to indices into *2^buckets_exp* buckets.
+    /// mapped to indices into `n_buckets` buckets.
     ///
     /// The largest possible bucket exponent is 64.
-    fn subword_indices(&self, min_n: usize, max_n: usize, buckets_exp: usize) -> Vec<u64>;
+    fn subword_indices(&self, min_n: usize, max_n: usize, buckets: usize) -> Vec<u64>;
 }
 
 #[cfg(test)]
