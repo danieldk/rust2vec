@@ -6,6 +6,7 @@ use std::collections::{BinaryHeap, HashSet};
 use ndarray::{s, Array1, ArrayView1, ArrayView2, ArrayViewMut1};
 use ordered_float::NotNan;
 
+use crate::vocab::Vocab;
 use crate::Embeddings;
 
 /// A word with its similarity.
@@ -53,7 +54,10 @@ pub trait Analogy {
     ) -> Option<Vec<WordSimilarity>>;
 }
 
-impl Analogy for Embeddings {
+impl<V> Analogy for Embeddings<V>
+where
+    V: Vocab,
+{
     fn analogy(
         &self,
         word1: &str,
@@ -90,7 +94,10 @@ pub trait AnalogyBy {
         F: FnMut(ArrayView2<f32>, ArrayView1<f32>) -> Array1<f32>;
 }
 
-impl AnalogyBy for Embeddings {
+impl<V> AnalogyBy for Embeddings<V>
+where
+    V: Vocab,
+{
     fn analogy_by<F>(
         &self,
         word1: &str,
@@ -126,7 +133,10 @@ pub trait Similarity {
     fn similarity(&self, word: &str, limit: usize) -> Option<Vec<WordSimilarity>>;
 }
 
-impl Similarity for Embeddings {
+impl<V> Similarity for Embeddings<V>
+where
+    V: Vocab,
+{
     fn similarity(&self, word: &str, limit: usize) -> Option<Vec<WordSimilarity>> {
         self.similarity_by(word, limit, |embeds, embed| embeds.dot(&embed))
     }
@@ -150,7 +160,10 @@ pub trait SimilarityBy {
         F: FnMut(ArrayView2<f32>, ArrayView1<f32>) -> Array1<f32>;
 }
 
-impl SimilarityBy for Embeddings {
+impl<V> SimilarityBy for Embeddings<V>
+where
+    V: Vocab,
+{
     fn similarity_by<F>(
         &self,
         word: &str,
@@ -164,7 +177,7 @@ impl SimilarityBy for Embeddings {
         let mut skip = HashSet::new();
         skip.insert(word);
 
-        Some(self.similarity_(embed, &skip, limit, similarity))
+        Some(self.similarity_(embed.view(), &skip, limit, similarity))
     }
 }
 
@@ -180,7 +193,10 @@ trait SimilarityPrivate {
         F: FnMut(ArrayView2<f32>, ArrayView1<f32>) -> Array1<f32>;
 }
 
-impl SimilarityPrivate for Embeddings {
+impl<V> SimilarityPrivate for Embeddings<V>
+where
+    V: Vocab,
+{
     fn similarity_<F>(
         &self,
         embed: ArrayView1<f32>,

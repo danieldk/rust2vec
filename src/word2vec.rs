@@ -10,6 +10,7 @@ use failure::{err_msg, Error};
 use ndarray::{Array2, Axis};
 
 use super::*;
+use crate::vocab::{Vocab, WordVocab};
 
 /// Method to construct `Embeddings` from a word2vec binary file.
 ///
@@ -17,17 +18,18 @@ use super::*;
 /// from a file in word2vec binary format.
 pub trait ReadWord2Vec<R>
 where
+    Self: Sized,
     R: BufRead,
 {
     /// Read the embeddings from the given buffered reader.
-    fn read_word2vec_binary(reader: &mut R) -> Result<Embeddings, Error>;
+    fn read_word2vec_binary(reader: &mut R) -> Result<Self, Error>;
 }
 
-impl<R> ReadWord2Vec<R> for Embeddings
+impl<R> ReadWord2Vec<R> for Embeddings<WordVocab>
 where
     R: BufRead,
 {
-    fn read_word2vec_binary(reader: &mut R) -> Result<Embeddings, Error> {
+    fn read_word2vec_binary(reader: &mut R) -> Result<Self, Error> {
         let n_words = read_number(reader, b' ')?;
         let embed_len = read_number(reader, b'\n')?;
 
@@ -52,7 +54,7 @@ where
             }
         }
 
-        Ok(Embeddings::new(matrix, indices, words))
+        Ok(Embeddings::new(matrix, WordVocab::new(words, indices)))
     }
 }
 
@@ -87,9 +89,10 @@ where
     fn write_word2vec_binary(&self, w: &mut W) -> Result<(), Error>;
 }
 
-impl<W> WriteWord2Vec<W> for Embeddings
+impl<W, V> WriteWord2Vec<W> for Embeddings<V>
 where
     W: Write,
+    V: Vocab,
 {
     fn write_word2vec_binary(&self, w: &mut W) -> Result<(), Error>
     where

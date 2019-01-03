@@ -9,6 +9,8 @@ pub mod subword;
 
 pub mod text;
 
+pub mod vocab;
+
 pub mod word2vec;
 
 #[cfg(test)]

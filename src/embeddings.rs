@@ -1,9 +1,10 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::iter::Enumerate;
 use std::slice;
 
-use ndarray::{Array2, ArrayView1, ArrayView2, Axis};
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis};
+
+use crate::vocab::{Indices, Vocab};
 
 /// A word similarity.
 ///
@@ -46,22 +47,16 @@ impl<'a> PartialEq for WordSimilarity<'a> {
 /// This data structure stores word embeddings (also known as *word vectors*)
 /// and provides some useful methods on the embeddings, such as similarity
 /// and analogy queries.
-pub struct Embeddings {
+pub struct Embeddings<V> {
     matrix: Array2<f32>,
-    indices: HashMap<String, usize>,
-    words: Vec<String>,
+    vocab: V,
 }
 
-impl Embeddings {
-    pub(crate) fn new(
-        matrix: Array2<f32>,
-        indices: HashMap<String, usize>,
-        words: Vec<String>,
-    ) -> Embeddings {
+impl<V> Embeddings<V> {
+    pub(crate) fn new(matrix: Array2<f32>, vocab: V) -> Embeddings<V> {
         Embeddings {
             matrix: matrix,
-            indices: indices,
-            words: words,
+            vocab,
         }
     }
 
@@ -74,24 +69,39 @@ impl Embeddings {
     pub fn embed_len(&self) -> usize {
         self.matrix.cols()
     }
+}
 
+impl<V> Embeddings<V>
+where
+    V: Vocab,
+{
     /// Get the embedding of a word.
-    pub fn embedding(&self, word: &str) -> Option<ArrayView1<f32>> {
-        self.indices
-            .get(word)
-            .map(|idx| self.matrix.index_axis(Axis(0), *idx))
+    pub fn embedding(&self, word: &str) -> Option<Array1<f32>> {
+        match self.vocab.word_indices(word)? {
+            Indices::SingleIndex(idx) => Some(self.matrix.index_axis(Axis(0), idx).to_owned()),
+            Indices::MultiIndex(indices) => {
+                let embed_len = self.matrix.shape()[1];
+
+                let mut embed = Array1::<f32>::zeros((embed_len,));
+                for &idx in indices {
+                    embed += &self.matrix.index_axis(Axis(0), idx);
+                }
+
+                Some(embed)
+            }
+        }
     }
 
     /// Get the mapping from words to row indices of the embedding matrix.
-    pub fn indices(&self) -> &HashMap<String, usize> {
-        &self.indices
-    }
+    //pub fn indices(&self) -> &HashMap<String, usize> {
+    //&self.indices
+    //}
 
     /// Get an iterator over pairs of words and the corresponding embeddings.
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<V> {
         Iter {
             embeddings: self,
-            inner: self.words.iter().enumerate(),
+            inner: self.vocab.words().iter().enumerate(),
         }
     }
 
@@ -110,19 +120,22 @@ impl Embeddings {
 
     /// Get the number of words for which embeddings are stored.
     pub fn len(&self) -> usize {
-        self.words.len()
+        self.vocab.words().len()
     }
 
     /// Get the words for which embeddings are stored. The words line up with
     /// the rows in the matrix returned by `data`.
     pub fn words(&self) -> &[String] {
-        &self.words
+        &self.vocab.words()
     }
 }
 
-impl<'a> IntoIterator for &'a Embeddings {
+impl<'a, V> IntoIterator for &'a Embeddings<V>
+where
+    V: Vocab,
+{
     type Item = (&'a str, ArrayView1<'a, f32>);
-    type IntoIter = Iter<'a>;
+    type IntoIter = Iter<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -130,12 +143,12 @@ impl<'a> IntoIterator for &'a Embeddings {
 }
 
 /// Iterator over embeddings.
-pub struct Iter<'a> {
-    embeddings: &'a Embeddings,
+pub struct Iter<'a, V> {
+    embeddings: &'a Embeddings<V>,
     inner: Enumerate<slice::Iter<'a, String>>,
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl<'a, V> Iterator for Iter<'a, V> {
     type Item = (&'a str, ArrayView1<'a, f32>);
 
     fn next(&mut self) -> Option<Self::Item> {

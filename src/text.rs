@@ -8,6 +8,7 @@ use itertools::Itertools;
 use ndarray::{Array1, Array2, Axis};
 
 use super::*;
+use crate::vocab::{Vocab, WordVocab};
 
 /// Method to construct `Embeddings` from a text file.
 ///
@@ -18,17 +19,18 @@ use super::*;
 /// *word0 component_1 component_2 ... component_n*
 pub trait ReadText<R>
 where
+    Self: Sized,
     R: BufRead + Seek,
 {
     /// Read the embeddings from the given buffered reader.
-    fn read_text(reader: &mut R) -> Result<Embeddings, Error>;
+    fn read_text(reader: &mut R) -> Result<Self, Error>;
 }
 
-impl<R> ReadText<R> for Embeddings
+impl<R> ReadText<R> for Embeddings<WordVocab>
 where
     R: BufRead + Seek,
 {
-    fn read_text(reader: &mut R) -> Result<Embeddings, Error> {
+    fn read_text(reader: &mut R) -> Result<Self, Error> {
         let (vocab_len, embed_len) = text_vectors_dims(reader)?;
         reader.seek(SeekFrom::Start(0))?;
         read_embeds(reader, vocab_len, embed_len)
@@ -49,17 +51,18 @@ where
 /// *word0 component_1 component_2 ... component_n*
 pub trait ReadTextDims<R>
 where
+    Self: Sized,
     R: BufRead + Seek,
 {
     /// Read the embeddings from the given buffered reader.
-    fn read_text_dims(reader: &mut R) -> Result<Embeddings, Error>;
+    fn read_text_dims(reader: &mut R) -> Result<Self, Error>;
 }
 
-impl<R> ReadTextDims<R> for Embeddings
+impl<R> ReadTextDims<R> for Embeddings<WordVocab>
 where
     R: BufRead + Seek,
 {
-    fn read_text_dims(reader: &mut R) -> Result<Embeddings, Error> {
+    fn read_text_dims(reader: &mut R) -> Result<Self, Error> {
         let mut dims = String::new();
         reader.read_line(&mut dims)?;
 
@@ -79,7 +82,11 @@ where
     }
 }
 
-fn read_embeds<R>(reader: &mut R, vocab_len: usize, embed_len: usize) -> Result<Embeddings, Error>
+fn read_embeds<R>(
+    reader: &mut R,
+    vocab_len: usize,
+    embed_len: usize,
+) -> Result<Embeddings<WordVocab>, Error>
 where
     R: BufRead,
 {
@@ -118,7 +125,7 @@ where
         vocab_len
     );
 
-    Ok(Embeddings::new(matrix, indices, words))
+    Ok(Embeddings::new(matrix, WordVocab::new(words, indices)))
 }
 
 pub fn text_vectors_dims<R>(reader: &mut R) -> Result<(usize, usize), Error>
@@ -149,8 +156,9 @@ where
     fn write_text(&self, writer: &mut W) -> Result<(), Error>;
 }
 
-impl<W> WriteText<W> for Embeddings
+impl<W, V> WriteText<W> for Embeddings<V>
 where
+    V: Vocab,
     W: Write,
 {
     /// Write the embeddings to the given writer.
@@ -179,8 +187,9 @@ where
     fn write_text_dims(&self, writer: &mut W) -> Result<(), Error>;
 }
 
-impl<W> WriteTextDims<W> for Embeddings
+impl<W, V> WriteTextDims<W> for Embeddings<V>
 where
+    V: Vocab,
     W: Write,
 {
     fn write_text_dims(&self, write: &mut W) -> Result<(), Error> {
@@ -194,12 +203,13 @@ mod tests {
     use std::fs::File;
     use std::io::{BufReader, Read, Seek, SeekFrom};
 
+    use crate::vocab::WordVocab;
     use crate::word2vec::ReadWord2Vec;
     use crate::Embeddings;
 
     use super::{ReadText, ReadTextDims, WriteText, WriteTextDims};
 
-    fn read_word2vec() -> Embeddings {
+    fn read_word2vec() -> Embeddings<WordVocab> {
         let f = File::open("testdata/similarity.bin").unwrap();
         let mut reader = BufReader::new(f);
         Embeddings::read_word2vec_binary(&mut reader).unwrap()
@@ -212,7 +222,6 @@ mod tests {
         let text_embeddings = Embeddings::read_text(&mut reader).unwrap();
 
         let embeddings = read_word2vec();
-        assert_eq!(text_embeddings.indices(), embeddings.indices());
         assert_eq!(text_embeddings.words(), embeddings.words());
         assert_eq!(text_embeddings.data(), embeddings.data());
     }
@@ -224,7 +233,6 @@ mod tests {
         let text_embeddings = Embeddings::read_text_dims(&mut reader).unwrap();
 
         let embeddings = read_word2vec();
-        assert_eq!(text_embeddings.indices(), embeddings.indices());
         assert_eq!(text_embeddings.words(), embeddings.words());
         assert_eq!(text_embeddings.data(), embeddings.data());
     }
