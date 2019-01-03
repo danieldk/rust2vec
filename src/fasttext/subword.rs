@@ -1,10 +1,15 @@
 use crate::subword::{NGrams, SubwordIndices};
 
-pub struct FastTextStr<'a>(&'a str);
+pub struct FastTextStr<S>(pub S)
+where
+    S: AsRef<str>;
 
-impl<'a> SubwordIndices for FastTextStr<'a> {
+impl<S> SubwordIndices for FastTextStr<S>
+where
+    S: AsRef<str>,
+{
     fn subword_indices(&self, min_n: usize, max_n: usize, n_buckets: usize) -> Vec<u64> {
-        let chars: Vec<_> = self.0.chars().collect();
+        let chars: Vec<_> = self.0.as_ref().chars().collect();
 
         NGrams::new(&chars, min_n, max_n)
             .map(|ngram| fasttext_hash(ngram) as u64 % n_buckets as u64)

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-pub enum Indices<'a> {
+pub enum Indices {
     SingleIndex(usize),
-    MultiIndex(&'a [usize]),
+    MultiIndex(Vec<usize>),
 }
 
 pub trait Vocab {

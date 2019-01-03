@@ -83,7 +83,7 @@ where
                 let embed_len = self.matrix.shape()[1];
 
                 let mut embed = Array1::<f32>::zeros((embed_len,));
-                for &idx in indices {
+                for idx in indices {
                     embed += &self.matrix.index_axis(Axis(0), idx);
                 }
 
