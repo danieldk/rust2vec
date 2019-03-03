@@ -145,7 +145,7 @@ impl SubwordVocab {
                 self.buckets_exp as usize,
             )
             .into_iter()
-            .map(|idx| idx as usize + self.len())
+            .map(|(_, idx)| idx as usize + self.len())
             .collect::<Vec<_>>();
         if indices.is_empty() {
             None

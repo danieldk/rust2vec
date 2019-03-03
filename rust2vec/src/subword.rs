@@ -80,11 +80,11 @@ pub trait SubwordIndices {
     /// mapped to indices into *2^buckets_exp* buckets.
     ///
     /// The largest possible bucket exponent is 64.
-    fn subword_indices(&self, min_n: usize, max_n: usize, buckets_exp: usize) -> Vec<u64>;
+    fn subword_indices(&self, min_n: usize, max_n: usize, buckets_exp: usize) -> Vec<(&str, u64)>;
 }
 
 impl SubwordIndices for str {
-    fn subword_indices(&self, min_n: usize, max_n: usize, buckets_exp: usize) -> Vec<u64> {
+    fn subword_indices(&self, min_n: usize, max_n: usize, buckets_exp: usize) -> Vec<(&str, u64)> {
         assert!(
             buckets_exp <= 64,
             "The largest possible buckets exponent is 64."
@@ -96,13 +96,23 @@ impl SubwordIndices for str {
             (1 << buckets_exp) - 1
         };
 
-        let chars: Vec<_> = self.chars().collect();
+        let chars: Vec<_> = self.char_indices().collect();
 
         let mut indices = Vec::with_capacity((max_n - min_n + 1) * chars.len());
         for ngram in NGrams::new(&chars, min_n, max_n) {
+            // Compute the index.
             let mut hasher = FnvHasher::default();
-            ngram.hash(&mut hasher);
-            indices.push(hasher.finish() & mask);
+            ngram.len().hash(&mut hasher);
+            for (_, ch) in ngram {
+                ch.hash(&mut hasher);
+            }
+            let index = hasher.finish() & mask;
+
+            // Get the string slice that the n-gram corresponds to.
+            let lower = ngram.first().expect("Empty n-gram").0;
+            let last = ngram.last().expect("Empty n-gram");
+            let upper = last.0 + last.1.len_utf8();
+            indices.push((&self[lower..upper], index));
         }
 
         indices
@@ -212,24 +222,20 @@ mod tests {
     }
 
     lazy_static! {
-        static ref SUBWORD_TESTS_2: HashMap<&'static str, Vec<u64>> = hashmap! {
+        static ref SUBWORD_TESTS_2: HashMap<&'static str, Vec<(&'static str, u64)>> = hashmap! {
             "<Daniël>" =>
-                vec![0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3],
+                vec![("<Da", 3), ("<Dan", 2), ("<Dani", 2), ("<Danië", 2), ("Dan", 1), ("Dani", 3), ("Danië", 1), ("Daniël", 2), ("ani", 0), ("anië", 0), ("aniël", 1), ("aniël>", 0), ("iël", 0), ("iël>", 1), ("nië", 2), ("niël", 1), ("niël>", 2), ("ël>", 3)],
             "<hallo>" =>
-                vec![0, 0, 0, 0, 1, 1, 1, 2, 3, 3, 3, 3, 3, 3],
+                vec![("<ha", 3), ("<hal", 0), ("<hall", 1), ("<hallo", 1), ("all", 3), ("allo", 3), ("allo>", 0), ("hal", 3), ("hall", 0), ("hallo", 2), ("hallo>", 3), ("llo", 1), ("llo>", 0), ("lo>", 3)],
         };
     }
 
     lazy_static! {
-        static ref SUBWORD_TESTS_21: HashMap<&'static str, Vec<u64>> = hashmap! {
+        static ref SUBWORD_TESTS_21: HashMap<&'static str, Vec<(&'static str, u64)>> = hashmap! {
             "<Daniël>" =>
-                vec![214157, 233912, 311961, 488897, 620206, 741276, 841219,
-                     1167494, 1192256, 1489905, 1532271, 1644730, 1666166,
-                     1679745, 1680294, 1693100, 2026735, 2065822],
+                vec![("<Da", 2026735), ("<Dan", 1666166), ("<Dani", 2065822), ("<Danië", 1680294), ("Dan", 214157), ("Dani", 841219), ("Danië", 311961), ("Daniël", 1167494), ("ani", 1192256), ("anië", 741276), ("aniël", 1679745), ("aniël>", 1693100), ("iël", 233912), ("iël>", 488897), ("nië", 1644730), ("niël", 1489905), ("niël>", 620206), ("ël>", 1532271)],
             "<hallo>" =>
-                vec![75867, 104120, 136555, 456131, 599360, 722393, 938007,
-                     985859, 1006102, 1163391, 1218704, 1321513, 1505861,
-                     1892376],
+                vec![("<ha", 985859), ("<hal", 104120), ("<hall", 1505861), ("<hallo", 1321513), ("all", 938007), ("allo", 1163391), ("allo>", 599360), ("hal", 456131), ("hall", 1892376), ("hallo", 1006102), ("hallo>", 136555), ("llo", 722393), ("llo>", 1218704), ("lo>", 75867)],
         };
     }
 
