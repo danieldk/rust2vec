@@ -13,6 +13,7 @@ use rand_xorshift::XorShiftRng;
 use reductive::pq::{QuantizeVector, ReconstructVector, TrainPQ, PQ};
 
 use crate::io::private::{ChunkIdentifier, MmapChunk, ReadChunk, TypeId, WriteChunk};
+use crate::util::padding;
 
 /// Copy-on-write wrapper for `Array`/`ArrayView`.
 ///
@@ -784,11 +785,6 @@ where
             norms,
         }
     }
-}
-
-fn padding<T>(pos: u64) -> u64 {
-    let size = size_of::<T>() as u64;
-    size - (pos % size)
 }
 
 #[cfg(test)]

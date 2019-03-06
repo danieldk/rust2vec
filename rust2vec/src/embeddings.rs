@@ -14,6 +14,7 @@ use crate::io::{
     MmapEmbeddings, ReadEmbeddings, WriteEmbeddings,
 };
 use crate::metadata::Metadata;
+use crate::norms::Norms;
 use crate::storage::{
     CowArray, CowArray1, MmapArray, NdArray, QuantizedArray, Storage, StorageViewWrap, StorageWrap,
 };
@@ -28,15 +29,45 @@ use crate::vocab::{SimpleVocab, SubwordVocab, Vocab, VocabWrap, WordIndex};
 #[derive(Debug)]
 pub struct Embeddings<V, S> {
     metadata: Option<Metadata>,
+    norms: Norms,
     storage: S,
     vocab: V,
 }
 
-impl<V, S> Embeddings<V, S> {
+impl<V, S> Embeddings<V, S>
+where
+    S: Storage,
+    V: Vocab,
+{
     /// Construct an embeddings from a vocabulary and storage.
     pub fn new(metadata: Option<Metadata>, vocab: V, storage: S) -> Self {
+        let norms = Self::norms(&storage, vocab.len());
+
         Embeddings {
             metadata,
+            norms,
+            vocab,
+            storage,
+        }
+    }
+
+    fn norms(storage: &S, vocab_len: usize) -> Norms {
+        let mut norms = Vec::with_capacity(vocab_len);
+
+        for idx in 0..vocab_len {
+            let embed = storage.embedding(idx);
+            let norm = embed.as_view().dot(&embed.as_view()).sqrt();
+            norms.push(norm);
+        }
+
+        Norms(Array1::from_vec(norms))
+    }
+
+    /// Construct an embeddings from a vocabulary and storage.
+    pub fn new_with_norms(metadata: Option<Metadata>, norms: Norms, vocab: V, storage: S) -> Self {
+        Embeddings {
+            metadata,
+            norms,
             vocab,
             storage,
         }
@@ -160,8 +191,8 @@ where
 impl<V, S> MmapEmbeddings for Embeddings<V, S>
 where
     Self: Sized,
-    V: ReadChunk,
-    S: MmapChunk,
+    V: ReadChunk + Vocab,
+    S: MmapChunk + Storage,
 {
     fn mmap_embeddings(read: &mut BufReader<File>) -> Result<Self, Error> {
         let header = Header::read_chunk(read)?;
@@ -177,18 +208,14 @@ where
         let vocab = V::read_chunk(read)?;
         let storage = S::mmap_chunk(read)?;
 
-        Ok(Embeddings {
-            metadata,
-            vocab,
-            storage,
-        })
+        Ok(Self::new(metadata, vocab, storage))
     }
 }
 
 impl<V, S> ReadEmbeddings for Embeddings<V, S>
 where
-    V: ReadChunk,
-    S: ReadChunk,
+    V: ReadChunk + Vocab,
+    S: ReadChunk + Storage,
 {
     fn read_embeddings<R>(read: &mut R) -> Result<Self, Error>
     where
@@ -207,11 +234,7 @@ where
         let vocab = V::read_chunk(read)?;
         let storage = S::read_chunk(read)?;
 
-        Ok(Embeddings {
-            metadata,
-            vocab,
-            storage,
-        })
+        Ok(Self::new(metadata, vocab, storage))
     }
 }
 
