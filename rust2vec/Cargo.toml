@@ -15,6 +15,9 @@ exclude = [
   ".travis.yml"
 ]
 
+[badges]
+maintenance = { status = "deprecated" }
+
 [dependencies]
 byteorder = "1"
 failure = "0.1"

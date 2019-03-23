@@ -5,6 +5,7 @@
 //! format, which has several benefits over the word2vec and GloVe
 //! formats.
 
+#[deprecated(note = "rust2vec is superseded by the finalfusion crate"]
 pub mod embeddings;
 
 pub mod io;
